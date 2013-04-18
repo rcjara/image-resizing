@@ -6,6 +6,9 @@ public class SeamCarver {
   private Picture pict;
   private int width;
   private int height;
+  private boolean direction;
+  private double[][] accumulatedEnergy;
+  private int[][] from;
 
   public SeamCarver(Picture picture) {
     pict = picture;
@@ -62,48 +65,18 @@ public class SeamCarver {
       bound2 = width;
     }
 
-    //create accumulation matrix
-    double[] accum = new double[bound2];
-    for (int i = 0; i < bound2; i++) { accum[i] = 0; }
-    double[] prev = accum;
-
-    int[][] from = new int[bound1][bound2];
-
-    for (int i = 1; i < bound1; i++) {
-      accum = new double[bound2];
-
-      for (int j = 0; j < bound2; j++) {
-        double min1 = Double.POSITIVE_INFINITY;
-        double min2 = Double.POSITIVE_INFINITY;
-        double min3 = Double.POSITIVE_INFINITY;
-        double curEnergy = getEnergy(i, j, flip);
-
-        if (j > 0) min1 = curEnergy + prev[j - 1];
-        min2 = curEnergy + prev[j];
-        if (j < bound2 - 1) min3 = curEnergy + prev[j + 1];
-
-        if (min1 <= min2 && min1 <= min3) {
-          accum[j] = min1;
-          from[i][j] = j - 1;
-        } else if (min2 <= min1 && min2 <= min3) {
-          accum[j] = min2;
-          from[i][j] = j;
-        } else {
-          accum[j] = min3;
-          from[i][j] = j + 1;
-        }
-      }
-
-      prev = accum;
+    if (direction != flip || accumulatedEnergy == null) {
+      generateAccumulatedEnergy(flip);
     }
+    direction = flip;
 
     //choose min root for path
     double min = Double.POSITIVE_INFINITY;
     int minJ = -1;
     for (int j = 0; j < bound2; j++) {
-      if (accum[j] < min) {
+      if (accumulatedEnergy[bound1 - 1][j] < min) {
         minJ = j;
-        min = accum[j];
+        min = accumulatedEnergy[bound1 - 1][j];
       }
     }
 
@@ -116,6 +89,56 @@ public class SeamCarver {
     }
 
     return path;
+  }
+
+  private void generateAccumulatedEnergy(boolean flip) {
+    int bound1;
+    int bound2;
+
+    if (!flip) {
+      bound1 = width;
+      bound2 = height;
+    } else {
+      bound1 = height;
+      bound2 = width;
+    }
+    direction = flip;
+
+    //create accumulation matrix
+    accumulatedEnergy = new double[bound1][bound2];
+    for (int i = 0; i < bound2; i++) { accumulatedEnergy[0][i] = 0; }
+
+    from = new int[bound1][bound2];
+
+    for (int i = 1; i < bound1; i++) {
+      for (int j = 0; j < bound2; j++) {
+        accumulatedEnergy[i][j] = newAccumulatedEnergy(i, j);
+      }
+    }
+  }
+
+  private double newAccumulatedEnergy(int i, int j) {
+    double min1 = Double.POSITIVE_INFINITY;
+    double min2 = Double.POSITIVE_INFINITY;
+    double min3 = Double.POSITIVE_INFINITY;
+    double curEnergy = getEnergy(i, j, direction);
+
+    int bound2 = !direction ? height : width;
+
+    if (j > 0) min1 = curEnergy + accumulatedEnergy[i - 1][j - 1];
+    min2 = curEnergy + accumulatedEnergy[i - 1][j];
+    if (j < bound2 - 1) min3 = curEnergy + accumulatedEnergy[i - 1][j + 1];
+
+    if (min1 <= min2 && min1 <= min3) {
+      from[i][j] = j - 1;
+      return min1;
+    } else if (min2 <= min1 && min2 <= min3) {
+      from[i][j] = j;
+      return min2;
+    } else {
+      from[i][j] = j + 1;
+      return min3;
+    }
   }
 
   private double getEnergy(int i, int j, boolean flip) {
@@ -154,21 +177,75 @@ public class SeamCarver {
   public void removeHorizontalSeam(int[] a) {  // remove horizontal seam from picture
     if (a.length != width) { throw new IllegalArgumentException(); }
     height--;
+    direction = false;
 
     for (int i = 0; i < width; i++) {
       for (int j = a[i]; j < height; j++) {
         pict.set(i, j, pict.get(i, j + 1));;
       }
     }
+
+    removeSeam(a);
   }
 
   public void removeVerticalSeam(int[] a) {  // remove vertical seam from picture
     if (a.length != height) { throw new IllegalArgumentException(); }
     width--;
+    direction = true;
 
     for (int j = 0; j < height; j++) {
       for (int i = a[j]; i < width; i++) {
         pict.set(i, j, pict.get(i + 1, j));
+      }
+    }
+
+    removeSeam(a);
+  }
+
+  private void removeSeam(int[] a) {
+    int bound1;
+    int bound2;
+
+    if (!direction) {
+      bound1 = width;
+      bound2 = height;
+    } else {
+      bound1 = height;
+      bound2 = width;
+    }
+
+    int[] minChanged = new int[a.length];
+    int[] maxChanged = new int[a.length];
+
+    for (int i = 0; i < a.length; i++) {
+      minChanged[i] = a[i];
+      maxChanged[i] = a[i];
+    }
+
+    //remove the actual cells from the array
+    for (int i = 1; i < bound1; i++) {
+      for (int j = a[i]; j < bound2; j++) {
+        accumulatedEnergy[i][j] = accumulatedEnergy[i][j + 1];
+        from[i][j] = from[i][j + 1] - 1;
+      }
+    }
+
+    for (int i = 1; i < bound1; i++) {
+      int jStart = Math.max(0, minChanged[i - 1] - 2);
+      int jStop = Math.min(bound2, maxChanged[i - 1] + 2);
+      //System.out.println("i: " + i + " jStart: " + jStart + " jStop: " + jStop + " diff: " + (jStop - jStart));
+      for (int j = jStart; j < jStop; j++) {
+        double newEnergy = newAccumulatedEnergy(i, j);
+        if (newEnergy != accumulatedEnergy[i][j]) {
+          //System.out.println("Changing energy at: " + i + "," + j + " from: " + accumulatedEnergy[i][j] + " to: " + newEnergy);
+          accumulatedEnergy[i][j] = newEnergy;
+          if (j < minChanged[i]) {
+              //System.out.println("New minChanged[i]: " + j);
+              minChanged[i] = j; }
+          if (j > maxChanged[i]) {
+              //System.out.println("New maxChanged[i]: " + j);
+              maxChanged[i] = j; }
+        }
       }
     }
   }
