@@ -85,7 +85,7 @@ public class SeamCarver {
     int curJ = minJ;
     for (int i = bound1 - 1; i >= 0; i--) {
       path[i] = curJ;
-      curJ = from[i][curJ];
+      curJ += from[i][curJ];
     }
 
     return path;
@@ -130,13 +130,13 @@ public class SeamCarver {
     if (j < bound2 - 1) min3 = curEnergy + accumulatedEnergy[i - 1][j + 1];
 
     if (min1 <= min2 && min1 <= min3) {
-      from[i][j] = j - 1;
+      from[i][j] = -1;
       return min1;
     } else if (min2 <= min1 && min2 <= min3) {
-      from[i][j] = j;
+      from[i][j] = 0;
       return min2;
     } else {
-      from[i][j] = j + 1;
+      from[i][j] = 1;
       return min3;
     }
   }
@@ -226,7 +226,7 @@ public class SeamCarver {
     for (int i = 1; i < bound1; i++) {
       for (int j = a[i]; j < bound2; j++) {
         accumulatedEnergy[i][j] = accumulatedEnergy[i][j + 1];
-        from[i][j] = from[i][j + 1] - 1;
+        from[i][j] = from[i][j + 1];
       }
     }
 
