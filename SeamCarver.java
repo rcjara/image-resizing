@@ -37,6 +37,14 @@ public class SeamCarver {
     return height;
   }
 
+  private Bounds bounds() {
+    if (!direction) {
+      return new Bounds(width, height);
+    } else {
+      return new Bounds(height, width);
+    }
+  }
+
   public double energy(int x, int y) {           // energy of pixel at column x and row y
     if (x < 0 || x > width - 1 ||
         y < 0 || y > height - 1) {
@@ -54,21 +62,13 @@ public class SeamCarver {
   }
 
   private int[] minPath(boolean flip) {
-    int bound1;
-    int bound2;
-
-    if (!flip) {
-      bound1 = width;
-      bound2 = height;
-    } else {
-      bound1 = height;
-      bound2 = width;
-    }
-
     if (direction != flip || accumulatedEnergy == null) {
       generateAccumulatedEnergy(flip);
     }
+
     direction = flip;
+    int bound1 = bounds().getB1();
+    int bound2 = bounds().getB2();
 
     //choose min root for path
     double min = Double.POSITIVE_INFINITY;
@@ -92,17 +92,9 @@ public class SeamCarver {
   }
 
   private void generateAccumulatedEnergy(boolean flip) {
-    int bound1;
-    int bound2;
-
-    if (!flip) {
-      bound1 = width;
-      bound2 = height;
-    } else {
-      bound1 = height;
-      bound2 = width;
-    }
     direction = flip;
+    int bound1 = bounds().getB1();
+    int bound2 = bounds().getB2();
 
     //create accumulation matrix
     accumulatedEnergy = new double[bound1][bound2];
@@ -203,16 +195,8 @@ public class SeamCarver {
   }
 
   private void removeSeam(int[] a) {
-    int bound1;
-    int bound2;
-
-    if (!direction) {
-      bound1 = width;
-      bound2 = height;
-    } else {
-      bound1 = height;
-      bound2 = width;
-    }
+    int bound1 = bounds().getB1();
+    int bound2 = bounds().getB2();
 
     int[] minChanged = new int[a.length];
     int[] maxChanged = new int[a.length];
@@ -233,7 +217,7 @@ public class SeamCarver {
     for (int i = 1; i < bound1; i++) {
       int jStart = Math.max(0, minChanged[i - 1] - 2);
       int jStop = Math.min(bound2, maxChanged[i - 1] + 2);
-      //System.out.println("i: " + i + " jStart: " + jStart + " jStop: " + jStop + " diff: " + (jStop - jStart));
+
       for (int j = jStart; j < jStop; j++) {
         double newEnergy = newAccumulatedEnergy(i, j);
         if (newEnergy != accumulatedEnergy[i][j]) {
@@ -249,6 +233,19 @@ public class SeamCarver {
     Picture pict = new Picture("HJoceanSmall.png");
     SeamCarver sc = new SeamCarver(pict);
     sc.picture().show();
+  }
+
+  private class Bounds {
+    private int bounds1;
+    private int bounds2;
+
+    public Bounds(int b1, int b2) {
+      bounds1 = b1;
+      bounds2 = b2;
+    }
+
+    public int getB1() { return bounds1; }
+    public int getB2() { return bounds2; }
   }
 }
 
