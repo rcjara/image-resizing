@@ -237,14 +237,9 @@ public class SeamCarver {
       for (int j = jStart; j < jStop; j++) {
         double newEnergy = newAccumulatedEnergy(i, j);
         if (newEnergy != accumulatedEnergy[i][j]) {
-          //System.out.println("Changing energy at: " + i + "," + j + " from: " + accumulatedEnergy[i][j] + " to: " + newEnergy);
           accumulatedEnergy[i][j] = newEnergy;
-          if (j < minChanged[i]) {
-              //System.out.println("New minChanged[i]: " + j);
-              minChanged[i] = j; }
-          if (j > maxChanged[i]) {
-              //System.out.println("New maxChanged[i]: " + j);
-              maxChanged[i] = j; }
+          if (j < minChanged[i]) { minChanged[i] = j; }
+          if (j > maxChanged[i]) { maxChanged[i] = j; }
         }
       }
     }
