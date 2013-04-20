@@ -48,7 +48,7 @@ public class SeamCarver {
   public double energy(int x, int y) {           // energy of pixel at column x and row y
     if (x < 0 || x > width - 1 ||
         y < 0 || y > height - 1) {
-      throw new IndexOutOfBoundsException();
+      return 195075.0;
     }
     if (x == 0 || x == width - 1 ||
         y == 0 || y == height - 1) {
@@ -73,10 +73,17 @@ public class SeamCarver {
     //choose min root for path
     double min = Double.POSITIVE_INFINITY;
     int minJ = -1;
+    double found = 0;
     for (int j = 0; j < bound2; j++) {
       if (accumulatedEnergy[bound1 - 1][j] < min) {
         minJ = j;
         min = accumulatedEnergy[bound1 - 1][j];
+        found = 1;
+      } else if (accumulatedEnergy[bound1 - 1][j] == min) {
+        found++;
+        if (Math.random() < 1 / found) {
+          minJ = j;
+        }
       }
     }
 
@@ -198,20 +205,27 @@ public class SeamCarver {
     int bound1 = bounds().getB1();
     int bound2 = bounds().getB2();
 
-    int[] minChanged = new int[a.length];
-    int[] maxChanged = new int[a.length];
-
-    for (int i = 0; i < a.length; i++) {
-      minChanged[i] = a[i];
-      maxChanged[i] = a[i];
-    }
-
     //remove the actual cells from the array
     for (int i = 1; i < bound1; i++) {
       for (int j = a[i]; j < bound2; j++) {
         accumulatedEnergy[i][j] = accumulatedEnergy[i][j + 1];
         from[i][j] = from[i][j + 1];
       }
+    }
+
+    calculateChanges(a);
+  }
+
+  private void calculateChanges(int[] a) {
+    int bound1 = bounds().getB1();
+    int bound2 = bounds().getB2();
+
+    int[] minChanged = new int[a.length];
+    int[] maxChanged = new int[a.length];
+
+    for (int i = 0; i < a.length; i++) {
+      minChanged[i] = a[i];
+      maxChanged[i] = a[i];
     }
 
     for (int i = 1; i < bound1; i++) {
@@ -227,6 +241,141 @@ public class SeamCarver {
         }
       }
     }
+  }
+
+  private void growPictHeight() {
+    if (pict.height() > height) { return; }
+
+    Picture newPict = new Picture(pict.width(), pict.height() * 2);
+
+    for (int i = 0; i < width; i++) {
+      for (int j = 0; j < height; j++) {
+        newPict.set(i, j, pict.get(i, j));
+      }
+    }
+
+    pict = newPict;
+  }
+
+  private void growInternalArrays() {
+    int bound1 = bounds().getB1();
+    int bound2 = bounds().getB2();
+
+    if (from[0].length > bound2) { return; }
+
+    for (int i = 0; i < bound1; i++) {
+      int[] newFrom = new int[bound2 * 2];
+      double[] newAccumulatedEnergy = new double[bound2 * 2];
+      for (int j = 0; j < bound2; j++) {
+        newFrom[j] = from[i][j];
+        newAccumulatedEnergy[j] = accumulatedEnergy[i][j];
+      }
+      from[i] = newFrom;
+      accumulatedEnergy[i] = newAccumulatedEnergy;
+    }
+  }
+
+  public void addHorizontalSeam(int[] a) {
+    growPictHeight();
+    growInternalArrays();
+    height++;
+    for (int i = 0; i < width; i++) {
+      for (int j = height; j > a[i]; j--) {
+        accumulatedEnergy[i][j] = accumulatedEnergy[i][j - 1];
+        from[i][j] = from[i][j - 1];
+        pict.set(i, j, pict.get(i, j - 1));
+      }
+    }
+
+    int[] b = new int[width];
+    for (int i = 0; i < width; i++) { b[i] = a[i]; }
+
+    //Offset[] offsets = new Offset[width];
+    Color[] newPixels = new Color[width];
+    for (int i = 0; i < width; i++) {
+      newPixels[i] = pict.get(i, b[i]);
+    }
+
+
+    //*/
+    newPixels[0] = pict.get(0, b[0]);
+    newPixels[width - 1] = pict.get(width - 1, b[width - 1]);
+    for (int i = 1; i < width - 1; i++) {
+      double thisEnergy = getEnergy(i, b[i], false);
+      double prevEnergy = getEnergy(i, b[i - 1], false);
+      double nextEnergy = getEnergy(i, b[i + 1], false);
+
+      if (prevEnergy < nextEnergy) {
+        newPixels[i] = pict.get(i + 1, b[i + 1]);
+      } else {
+        newPixels[i] = pict.get(i - 1, b[i - 1]);
+      }
+
+      if (prevEnergy < thisEnergy && nextEnergy < thisEnergy) {
+        newPixels[i] = blend(pict.get(i - 1, b[i - 1]), pict.get(i + 1, b[i + 1]));
+      }
+    }
+   //*/
+
+    for (int i = 0; i < width; i++) {
+      pict.set(i, b[i], newPixels[i]);
+    }
+
+/*
+    for (int i = 0; i < width; i++) {
+      Offset offset = offsets[i];
+      int x = i + offset.getI();
+      int y = b[i] + offset.getJ();
+      x = x < 0 ? 0 : x;
+      x = width > x ? x : width - 1;
+      y = y < 0 ? 0 : y;
+      y = height > y ? y : height - 1;
+      pict.set(i, b[i], pict.get(x, y));
+
+      //replaceWithLeastNeighbor(i, b[i]);
+    }
+//*/
+
+    calculateChanges(a);
+  }
+
+  private void shuffle(Color[] a) {
+    int N = a.length;
+    for (int i = 0; i < N; i++) {
+      // int from remainder of deck
+      int r = i + (int) Math.floor(Math.random() * (N - i));
+      Color swap = a[r];
+      a[r] = a[i];
+      a[i] = swap;
+    }
+  }
+
+  private Color blend(Color c1, Color c2) {
+     return new Color((c1.getRed() + c2.getRed()) / 2,
+                      (c1.getGreen() + c2.getGreen()) / 2,
+                      (c1.getBlue() + c2.getBlue()) / 2);
+  }
+
+  private Offset replaceWithLeastNeighbor(int i, int j) {
+    int iOffset = 0;
+    int jOffset = 0;
+    double leastFound = 0;
+
+    for (int io = -1; io < 2; io++) {
+      for (int jo = -1; jo < 2; jo++) {
+        if (io == 0 && jo == 0) { continue; }
+        if (i + io < 0 || j + jo < 0 || i + io >= width || j + jo >= height) { continue; }
+
+        double energy = getEnergy(i + io, j + jo, false);
+        if (energy > leastFound) {
+          leastFound = energy;
+          iOffset = io;
+          jOffset = jo;
+        }
+      }
+    }
+
+    return new Offset(iOffset, jOffset);
   }
 
   public static void main(String[] args) {
@@ -246,6 +395,19 @@ public class SeamCarver {
 
     public int getB1() { return bounds1; }
     public int getB2() { return bounds2; }
+  }
+
+  private class Offset {
+    private int i;
+    private int j;
+
+    public Offset(int _i, int _j) {
+      i = _i;
+      j = _j;
+    }
+
+    public int getI() { return i; }
+    public int getJ() { return j; }
   }
 }
 
